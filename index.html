@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="kr">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <link rel="manifest" href="/manifest.json" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Lexend+Zetta:wght@100..900&display=swap"
+            rel="stylesheet" />
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.min.js"></script>
+
+        <title>zenn.camera</title>
+        <style>
+            html,
+            body {
+                margin: 0;
+                padding: 0;
+                height: 100%;
+            }
+
+            .container {
+                display: grid;
+                grid-template-columns: 80px 1fr 160px;
+                height: 100dvh;
+            }
+
+            .options {
+                background-color: lightblue;
+                display: flex;
+                align-items: center;
+                justify-content: space-evenly;
+                flex-direction: column;
+            }
+            .right .toggle-zoom-button {
+                visibility: hidden;
+            }
+
+            .center {
+                background-color: #000;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                overflow: hidden;
+                position: relative;
+            }
+
+            .right {
+                background-color: lightcoral;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: space-evenly;
+                position: relative;
+            }
+            .right .toggle-zoom-button,
+            .right .copyright {
+                flex: 1;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .rotate-message {
+                display: none;
+                align-items: center;
+                justify-content: center;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                background-color: #333;
+                color: #fff;
+                font-size: 1.5rem;
+                text-align: center;
+            }
+
+            #cameraPreview {
+                width: 100%;
+                height: 100%;
+                object-fit: contain;
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+            }
+
+            .circle-guide {
+                position: absolute;
+                width: 200px;
+                height: 200px;
+                pointer-events: none;
+                user-select: none;
+                top: 50%;
+                left: 50%;
+                background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='100' ry='100' stroke='%23EC3463' stroke-width='7' stroke-dasharray='50%25%2c 13%25' stroke-dashoffset='86' stroke-linecap='butt'/%3e%3c/svg%3e");
+                transform: translate(-50%, -50%);
+                border-radius: 100px;
+                animation: rotate 24s linear infinite;
+            }
+            .square-guide {
+                position: absolute;
+                width: 224px;
+                height: 224px;
+                pointer-events: none;
+                user-select: none;
+                top: 50%;
+                left: 50%;
+                background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' stroke='black' stroke-width='6' stroke-dasharray='4 %2c 8' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e");
+                transform: translate(-50%, -50%);
+            }
+            @keyframes rotate {
+                from {
+                    transform: translate(-50%, -50%) rotate(0deg);
+                }
+                to {
+                    transform: translate(-50%, -50%) rotate(360deg);
+                }
+            }
+            button svg path {
+                fill: #fff;
+            }
+            button.active svg path {
+                fill: yellow;
+            }
+            .camera-button {
+                width: 100px;
+                height: 100px;
+                background-color: red;
+                border-radius: 50%;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                position: relative;
+                cursor: pointer;
+                box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            }
+
+            .inner-circle {
+                width: 60px;
+                height: 60px;
+                background-color: white;
+                border-radius: 50%;
+                transition: transform 0.2s ease; /* 부드러운 애니메이션 */
+            }
+
+            .inner-circle.pressed {
+                transform: scale(0.9); /* 눌렸을 때 크기 변화 */
+            }
+            .copyright {
+                font-family: 'Lexend Zetta', sans-serif;
+                font-size: 0.5rem;
+                /* position: absolute;
+                bottom: 1rem;
+                left: 50%;
+                transform: translateX(-50%); */
+            }
+            .toggle-zoom-button {
+                width: 48px;
+                height: 48px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                font-size: 28px;
+                font-weight: 600;
+                color: #fff;
+                text-align: center;
+            }
+            .toggle-zoom-button.active {
+                color: yellow;
+            }
+            @media screen and (orientation: portrait) {
+                .container {
+                    grid-template-columns: 1fr; /* 세로 모드 레이아웃 */
+                    grid-template-rows: 80px 1fr 160px; /* 위, 중간, 아래 형태로 설정 */
+                }
+                .options {
+                    display: flex;
+                    flex-direction: row;
+                }
+                .right {
+                    flex-direction: row;
+                }
+                .options .toggle-zoom-button {
+                    display: none;
+                }
+                .right .toggle-zoom-button {
+                    visibility: visible;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="options">
+                <button
+                    class="toggle-zoom-button"
+                    style="border: none; background: none; padding: 0"
+                    id="zoomButton"
+                    onClick="toggleZoom()">
+                    x1
+                </button>
+                <button
+                    id="toggleGuide"
+                    class="toggle-button active"
+                    style="border: none; background: none; padding: 0">
+                    <svg
+                        width="48"
+                        height="48"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <g clip-path="url(#clip0_17_2775)">
+                            <path
+                                d="M17 12C17 9.24 14.76 7 12 7C9.24 7 7 9.24 7 12C7 14.76 9.24 17 12 17C14.76 17 17 14.76 17 12ZM12 15C10.35 15 9 13.65 9 12C9 10.35 10.35 9 12 9C13.65 9 15 10.35 15 12C15 13.65 13.65 15 12 15ZM5 15H3V19C3 20.1 3.9 21 5 21H9V19H5V15ZM5 5H9V3H5C3.9 3 3 3.9 3 5V9H5V5ZM19 3H15V5H19V9H21V5C21 3.9 20.1 3 19 3ZM19 19H15V21H19C20.1 21 21 20.1 21 19V15H19V19Z"
+                                fill="#323232" />
+                        </g>
+                        <defs>
+                            <clipPath id="clip0_17_2775">
+                                <rect width="24" height="24" fill="white" />
+                            </clipPath>
+                        </defs>
+                    </svg>
+                </button>
+                <button
+                    id="toggleSquareRatio"
+                    class="toggle-button active"
+                    style="border: none; background: none; padding: 0">
+                    <svg
+                        width="48"
+                        height="48"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <g clip-path="url(#clip0_17_2759)">
+                            <path
+                                d="M19 3H5C3.9 3 3 3.9 3 5V19C3 20.1 3.9 21 5 21H19C20.1 21 21 20.1 21 19V5C21 3.9 20.1 3 19 3ZM19 19H5V5H19V19Z"
+                                fill="#323232" />
+                        </g>
+                        <defs>
+                            <clipPath id="clip0_17_2759">
+                                <rect width="24" height="24" fill="white" />
+                            </clipPath>
+                        </defs>
+                    </svg>
+                </button>
+                <button
+                    id="toggleFullScreen"
+                    class="toggle-button"
+                    style="border: none; background: none; padding: 0">
+                    <svg
+                        width="48"
+                        height="48"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <g clip-path="url(#clip0_6_16049)">
+                            <path
+                                d="M21 11V3H13L16.29 6.29L6.29 16.29L3 13V21H11L7.71 17.71L17.71 7.71L21 11Z"
+                                fill="#323232" />
+                        </g>
+                        <defs>
+                            <clipPath id="clip0_6_16049">
+                                <rect width="24" height="24" fill="white" />
+                            </clipPath>
+                        </defs>
+                    </svg>
+                </button>
+            </div>
+            <div class="center">
+                <video id="cameraPreview" autoplay playsinline></video>
+                <div class="circle-guide" id="circleGuide"></div>
+                <div class="square-guide" id="squareGuide"></div>
+            </div>
+            <div class="right">
+                <button
+                    class="toggle-zoom-button"
+                    style="border: none; background: none; padding: 0"
+                    id="rightZoomButton"
+                    onClick="toggleZoom()">
+                    x1
+                </button>
+                <div id="captureButton" class="camera-button" onclick="handleClick()">
+                    <div class="inner-circle"></div>
+                </div>
+                <div class="copyright">zenn.camera</div>
+            </div>
+        </div>
+
+        <script>
+            let videoStream;
+            let isFrontCamera = false;
+            const video = document.getElementById('cameraPreview');
+            const captureButton = document.getElementById('captureButton');
+            const toggleGuideButton = document.getElementById('toggleGuide');
+            const toggleSquareRatioButton = document.getElementById('toggleSquareRatio');
+            const toggleFullScreenButton = document.getElementById('toggleFullScreen');
+            const circleGuide = document.getElementById('circleGuide');
+            const squareGuide = document.getElementById('squareGuide');
+            const zoomButtons = document.querySelectorAll('.toggle-zoom-button');
+
+            let guideVisible = true;
+            let isSquareRatio = true;
+            let isRearCameraActive = true;
+            let isZoomed = false;
+            let zoomLevels = [1, 2, 3];
+            let zoomIndex = 0;
+
+            async function startCamera() {
+                try {
+                    // 해상도 설정
+                    const constraints = {
+                        video: {
+                            facingMode: isRearCameraActive ? { exact: 'environment' } : 'user',
+                            width: { ideal: isSquareRatio ? 3024 : 4032 },
+                            height: { ideal: isSquareRatio ? 3024 : 3024 },
+                            // zoom: isZoomed ? 2 : 1, // 줌 레벨 설정
+                        },
+                    };
+
+                    if (videoStream) {
+                        videoStream.getTracks().forEach(track => track.stop());
+                    }
+
+                    videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+                    video.srcObject = videoStream;
+
+                    zoomIndex = 0;
+                    zoomButtons.forEach(button => {
+                        button.innerText = `x1`;
+                        button.classList.remove('active');
+                    });
+                } catch (error) {
+                    console.error('후면 카메라 접근 실패, 전면 카메라로 재시도:', error);
+
+                    const frontConstraints = {
+                        video: {
+                            facingMode: 'user',
+                            width: { ideal: isSquareRatio ? 1080 : 1920 },
+                            height: { ideal: isSquareRatio ? 1080 : 1080 },
+                        },
+                    };
+                    videoStream = await navigator.mediaDevices.getUserMedia(frontConstraints);
+                    video.srcObject = videoStream;
+                }
+            }
+
+            function toggleZoom() {
+                if (!videoStream) return;
+
+                const track = videoStream.getVideoTracks()[0];
+                const settings = track.getSettings();
+                const capabilities = track.getCapabilities();
+
+                if (!capabilities.zoom) {
+                    alert('이 기기에서 줌을 지원하지 않습니다.');
+                    return;
+                }
+
+                // 줌 단계를 순차적으로 변경
+                let currentZoom = zoomLevels[zoomIndex];
+                zoomIndex = (zoomIndex + 1) % zoomLevels.length; // 다음 인덱스로 이동, 마지막 후에는 1배로 돌아감
+
+                try {
+                    track.applyConstraints({
+                        advanced: [{ zoom: currentZoom }],
+                    });
+                    console.log(`줌 레벨이 ${currentZoom}배로 설정되었습니다.`);
+                    // 버튼 텍스트를 현재 줌 배율로 업데이트
+                    // document.getElementById('zoomButton').innerText = `x${currentZoom}`;
+                    zoomButtons.forEach(button => {
+                        button.innerText = `x${currentZoom}`;
+                    });
+
+                    // 1배가 아닐 경우 .active 클래스를 추가하고, 1배일 경우 제거
+                    if (currentZoom !== 1) {
+                        zoomButtons.forEach(button => {
+                            button.classList.add('active');
+                        });
+                    } else {
+                        zoomButtons.forEach(button => {
+                            button.classList.remove('active');
+                        });
+                    }
+                } catch (error) {
+                    console.error('줌 설정 중 오류가 발생했습니다: ', error);
+                }
+            }
+
+            function getFormattedTimestamp() {
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                const hour = String(now.getHours()).padStart(2, '0');
+                const minute = String(now.getMinutes()).padStart(2, '0');
+                const second = String(now.getSeconds()).padStart(2, '0');
+                return `${year}_${month}-${day} ${hour}-${minute}-${second}`;
+            }
+
+            function capturePhoto() {
+                // 촬영 버튼에 flash 클래스 추가
+                const innerCircle = document.querySelector('.inner-circle');
+                innerCircle.classList.add('pressed');
+
+                // 잠시 후에 flash 클래스 제거
+                setTimeout(() => {
+                    innerCircle.classList.remove('pressed');
+                }, 300); // 300ms 후에 제거
+
+                const canvas = document.createElement('canvas');
+                const videoWidth = video.videoWidth;
+                const videoHeight = video.videoHeight;
+
+                // 캔버스 크기를 비디오의 해상도에 맞게 설정
+                canvas.width = videoWidth;
+                canvas.height = videoHeight;
+
+                const context = canvas.getContext('2d');
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                const photoURL = canvas.toDataURL('image/png');
+
+                // 사용자 에이전트를 확인하여 아이폰인지 체크
+                const isIPhone = /iPhone/i.test(navigator.userAgent);
+
+                if (isIPhone) {
+                    // 아이폰인 경우 새로운 탭에서 이미지 열기
+                    const newTab = window.open();
+                    // newTab.document.body.innerHTML = `<img src="${photoURL}" alt="Captured Image" style="width:100%; height:auto;">`;
+                    newTab.document.body.innerHTML = `
+            <div style="text-align: center;">
+                <img src="${photoURL}" alt="Captured Image" style="width:100%; height:auto;">
+                <br>
+                <button onclick="window.close()" style="width: 400px; height: 80px; font-size: 3rem; margin-top: 8rem;">닫기</button>
+            </div>
+        `;
+                } else {
+                    const link = document.createElement('a');
+                    link.href = photoURL;
+                    link.download = `zenn camera-${getFormattedTimestamp()}.png`;
+                    link.click();
+                }
+            }
+
+            function toggleCamera() {
+                isFrontCamera = !isFrontCamera;
+                startCamera();
+            }
+
+            function toggleGuide() {
+                guideVisible = !guideVisible;
+                circleGuide.style.display = guideVisible ? 'block' : 'none';
+                squareGuide.style.display = guideVisible ? 'block' : 'none';
+            }
+
+            // 1:1 비율 토글 함수
+            function toggleSquareRatio() {
+                isSquareRatio = !isSquareRatio;
+                startCamera(); // 카메라를 다시 시작하여 해상도 변경
+            }
+
+            captureButton.addEventListener('click', capturePhoto);
+            toggleGuideButton.addEventListener('click', () => {
+                toggleGuideButton.classList.toggle('active');
+                // 가이드라인 토글 기능 추가
+                toggleGuide();
+            });
+
+            //   toggleSquareRatioButton.addEventListener("click", toggleSquareRatio);
+            toggleSquareRatioButton.addEventListener('click', () => {
+                toggleSquareRatioButton.classList.toggle('active');
+                toggleSquareRatio();
+            });
+
+            toggleFullScreenButton.addEventListener('click', () => {
+                toggleFullScreenButton.classList.toggle('active');
+                // 1:1 비율 전환 기능 추가
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen();
+                } else {
+                    if (document.exitFullscreen) {
+                        document.exitFullscreen();
+                    }
+                }
+            });
+
+            window.addEventListener('load', startCamera);
+        </script>
+    </body>
+</html>
